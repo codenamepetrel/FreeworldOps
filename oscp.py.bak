@@ -143,41 +143,6 @@ def search_category(cat):
     return rows
  
  
-def port_lookup(port):
-    """Look up a port number: show default service + recommended tools + their saved commands"""
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT port, service, description, tools FROM ports WHERE port = ?", (port,))
-    row = c.fetchone()
- 
-    if not row:
-        print(f"\n  {RED}[!] No entry for port {port}.{R}")
-        print(f"  {YLW}[*] Add one manually:{R} sqlite3 ~/.oscp_commands.db \"INSERT INTO ports VALUES ({port}, 'SERVICE', 'DESC', 'tool1,tool2');\"\n")
-        conn.close()
-        return
- 
-    port_no, service, desc, tools = row
-    print(f"\n  {CYN}{BLD}══ Port {port_no} — {service} ══{R}")
-    if desc:
-        print(f"  {DIM}{desc}{R}")
- 
-    tool_list = [t.strip() for t in tools.split(",") if t.strip()]
-    print(f"\n  {GRN}{BLD}Recommended tools:{R} {YLW}{', '.join(tool_list)}{R}\n")
- 
-    for tool in tool_list:
-        c.execute("""
-            SELECT tool, description, command, category, tags
-            FROM commands WHERE tool = ?
-            ORDER BY category
-        """, (tool,))
-        rows = c.fetchall()
-        if not rows:
-            continue
-        print_results(rows)
- 
-    conn.close()
- 
- 
 def list_categories():
     print(BANNER)
     print(f"  {BLD}{WHT}Available Categories:{R}\n")
@@ -193,7 +158,6 @@ def list_categories():
     print(f"\n  {BLD}{WHT}Usage Examples:{R}")
     print(f"  {CYN}oscp impacket{R}              {GRY}# show all impacket commands{R}")
     print(f"  {CYN}oscp kerberos{R}              {GRY}# search for kerberos commands{R}")
-    print(f"  {CYN}oscp 80{R}                    {GRY}# look up port 80 - service + tools{R}")
     print(f"  {CYN}oscp --cat privesc-linux{R}   {GRY}# show linux privesc category{R}")
     print(f"  {CYN}oscp --cat ad{R}              {GRY}# show all AD commands{R}")
     print(f"  {CYN}oscp --add{R}                 {GRY}# add a new command{R}")
@@ -244,7 +208,6 @@ Examples:
   oscp impacket              Search for impacket commands
   oscp kerberos              Search anything kerberos related
   oscp reverse shell         Search for reverse shell commands
-  oscp 80                    Look up port 80 - service + recommended tools
   oscp --cat privesc-linux   Show all linux privesc commands
   oscp --cat ad              Show all Active Directory commands
   oscp --add                 Add a new command
@@ -253,7 +216,7 @@ Examples:
         """
     )
  
-    parser.add_argument("query", nargs="*", help="Search term (tool name, keyword, tag, or port number)")
+    parser.add_argument("query", nargs="*", help="Search term (tool name, keyword, tag)")
     parser.add_argument("--cat", "-c", help="Filter by category")
     parser.add_argument("--add", "-a", action="store_true", help="Add a new command")
     parser.add_argument("--list", "-l", action="store_true", help="List all categories")
@@ -285,11 +248,6 @@ Examples:
         label = next((l for c, l in CATEGORIES if c == cat), cat)
         print(f"\n  {cat_color}{BLD}══ {label} ══{R}  {GRY}({len(rows)} commands){R}")
         print_results(rows)
-        return
- 
-    # Single numeric argument -> treat as a port lookup
-    if args.query and len(args.query) == 1 and args.query[0].isdigit():
-        port_lookup(int(args.query[0]))
         return
  
     if args.query:
